@@ -11,7 +11,7 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/gowvp/onvif v0.0.14
 	github.com/grafov/m3u8 v0.12.1
-	github.com/ixugo/goddd v1.5.6
+	github.com/ixugo/goddd v1.5.7
 	github.com/ixugo/netpulse v0.1.3
 	github.com/jinzhu/copier v0.4.0
 	github.com/pelletier/go-toml/v2 v2.3.0
@@ -24,6 +24,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/DeRuina/timberjack v1.4.1 // indirect
 	github.com/beevik/etree v1.1.0 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
@@ -31,6 +32,7 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/juju/errors v1.0.0 // indirect
+	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
@@ -65,8 +67,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible // indirect
-	github.com/lestrrat-go/strftime v1.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
