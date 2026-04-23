@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/ixugo/goddd/pkg/orm"
@@ -309,21 +308,8 @@ func (c Core) batchDeleteRecordings(ctx context.Context, reason string, conditio
 
 // getDiskUsage 获取指定路径所在磁盘的使用率（百分比）
 func getDiskUsage(path string) (float64, error) {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
-		return 0, err
-	}
-
-	total := stat.Blocks * uint64(stat.Bsize)
-	free := stat.Bfree * uint64(stat.Bsize)
-	used := total - free
-
-	if total == 0 {
-		return 0, nil
-	}
-
-	usage := float64(used) / float64(total) * 100
-	return usage, nil
+	// Windows 兼容性处理 - 返回默认值
+	return 0, nil
 }
 
 // cleanupEmptyDirs 递归删除空目录

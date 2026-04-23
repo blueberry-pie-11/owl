@@ -270,3 +270,8 @@ func (s *Server) StopPlay(ctx context.Context, in *StopPlayInput) error {
 func (s *Server) QuerySnapshot(deviceID, channelID string) error {
 	return s.gb.QuerySnapshot(deviceID, channelID)
 }
+
+// PTZControl 云台控制
+func (s *Server) PTZControl(deviceID, channelID, ptzCmd string) error {
+	return s.SendPTZCommand(deviceID, channelID, ptzCmd)
+}

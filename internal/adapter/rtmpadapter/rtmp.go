@@ -115,3 +115,9 @@ func (a *Adapter) StopPlay(ctx context.Context, device *ipc.Device, channel *ipc
 func (a *Adapter) ValidateDevice(ctx context.Context, device *ipc.Device) error {
 	return nil
 }
+
+// PTZControl implements ipc.Protocoler.
+// RTMP 协议不支持云台控制
+func (a *Adapter) PTZControl(ctx context.Context, device *ipc.Device, channel *ipc.Channel, cmd ipc.PTZCommand) error {
+	return nil
+}

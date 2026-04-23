@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/internal/core/sms"
@@ -101,7 +102,33 @@ func (g *GB28181API) Play(in *PlayInput) error {
 	})
 	if err != nil {
 		log.Debug("1.1. 开启RTP服务器失败", "err", err)
-		return err
+		// 如果是因为流已存在，先关闭再重新打开
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "-300") {
+			log.Info("RTP服务器已存在，尝试关闭后重新打开", "stream_id", in.Channel.ID)
+			// 关闭旧的 RTP 服务器
+			_, closeErr := g.sms.CloseRTPServer(in.SMS, zlm.CloseRTPServerRequest{
+				StreamID: in.Channel.ID,
+			})
+			if closeErr != nil {
+				log.Warn("关闭旧的RTP服务器失败", "err", closeErr)
+			} else {
+				log.Info("已关闭旧的RTP服务器，等待清理")
+				// 等待一小段时间让 ZLM 清理资源
+				time.Sleep(500 * time.Millisecond)
+			}
+			// 重新打开 RTP 服务器
+			resp, err = g.sms.OpenRTPServer(in.SMS, zlm.OpenRTPServerRequest{
+				TCPMode:  in.StreamMode,
+				StreamID: in.Channel.ID,
+			})
+			if err != nil {
+				log.Debug("1.2. 重新开启RTP服务器失败", "err", err)
+				return err
+			}
+			log.Info("成功重新打开RTP服务器", "port", resp.Port)
+		} else {
+			return err
+		}
 	}
 
 	log.Debug("2. 发送SDP请求", "port", resp.Port)

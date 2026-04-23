@@ -21,6 +21,7 @@ import (
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/internal/core/recording"
 	"github.com/gowvp/owl/internal/core/sms"
+	"github.com/gowvp/owl/pkg/gbs"
 	"github.com/gowvp/owl/pkg/zlm"
 	"github.com/ixugo/goddd/pkg/hook"
 	"github.com/ixugo/goddd/pkg/orm"
@@ -107,6 +108,7 @@ func registerGB28181(g gin.IRouter, api IPCAPI, handler ...gin.HandlerFunc) {
 		group.POST("/:id/ai/enable", web.WrapH(api.enableAI))        // 启用 AI 检测
 		group.POST("/:id/ai/disable", web.WrapH(api.disableAI))      // 禁用 AI 检测
 		group.POST("/:id/record_mode", web.WrapH(api.setRecordMode)) // 设置录像模式
+		group.POST("/:id/ptz/control", web.WrapH(api.ptzControl))    // 云台控制（所有协议）
 	}
 }
 
@@ -691,5 +693,84 @@ func (a IPCAPI) setRecordMode(c *gin.Context, in *setRecordModeInput) (gin.H, er
 	return gin.H{
 		"id":          channel.ID,
 		"record_mode": channel.Ext.GetRecordMode(),
+	}, nil
+}
+
+// ptzControlInput PTZ 控制请求参数
+type ptzControlInput struct {
+	Action    string  `json:"action" binding:"required,oneof=continuous stop absolute relative preset"` // 动作类型
+	Direction string  `json:"direction"`                                                                // 方向（连续移动时使用）
+	Speed     float64 `json:"speed"`                                                                    // 速度 (0-1)
+	X         float64 `json:"x"`                                                                        // X 轴位置
+	Y         float64 `json:"y"`                                                                        // Y 轴位置
+	Zoom      float64 `json:"zoom"`                                                                     // 缩放值
+	PresetID  string  `json:"preset_id"`                                                                // 预置位 ID
+	PresetOp  string  `json:"preset_op" binding:"omitempty,oneof=goto set remove"`                      // 预置位操作
+}
+
+// ptzControl 云台控制接口
+func (a IPCAPI) ptzControl(c *gin.Context, in *ptzControlInput) (gin.H, error) {
+	channelID := c.Param("id")
+	ctx := c.Request.Context()
+
+	// 获取通道信息
+	channel, err := a.ipc.GetChannel(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 获取设备信息
+	device, err := a.ipc.GetDevice(ctx, channel.DID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查设备是否在线
+	if !device.IsOnline {
+		return nil, reason.ErrBadRequest.SetMsg("设备离线")
+	}
+
+	slog.InfoContext(ctx, "PTZ 控制请求（跳过协议判断）",
+		"channel_id", channelID,
+		"channel_device_id", channel.DeviceID,
+		"channel_channel_id", channel.ChannelID,
+		"channel_ptztype", channel.PTZType, // 添加 PTZ 类型
+		"device_id", device.ID,
+		"device_type", device.Type,
+		"action", in.Action,
+		"direction", in.Direction)
+
+	// 直接使用 GB28181 的 PTZ 控制逻辑发送指令
+	var ptzCmd string
+	switch in.Action {
+	case "continuous":
+		// 连续移动
+		ptzCmd = gbs.BuildContinuousMove(in.Direction, in.Speed)
+		if ptzCmd == "" {
+			return nil, fmt.Errorf("不支持的方向: %s", in.Direction)
+		}
+		slog.InfoContext(ctx, "构建连续移动命令",
+			"direction", in.Direction,
+			"speed", in.Speed,
+			"ptz_cmd", ptzCmd)
+	case "stop":
+		// 停止移动
+		ptzCmd = gbs.BuildStop()
+		slog.InfoContext(ctx, "构建停止命令", "ptz_cmd", ptzCmd)
+	default:
+		return nil, fmt.Errorf("暂不支持的动作类型: %s，仅支持 continuous 和 stop", in.Action)
+	}
+
+	// 直接调用 GB28181 Server 发送 PTZ 命令
+	// 使用通道的 DeviceID（国标编码）和 ChannelID 作为目标
+	if err := a.uc.SipServer.PTZControl(device.DeviceID, channel.ChannelID, ptzCmd); err != nil {
+		slog.ErrorContext(ctx, "PTZ 控制失败", "err", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "PTZ 控制指令已发送", "ptz_cmd", ptzCmd)
+
+	return gin.H{
+		"msg": "PTZ 控制指令已发送",
 	}, nil
 }

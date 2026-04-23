@@ -13,8 +13,11 @@ import (
 	"github.com/gowvp/onvif"
 	devicemodel "github.com/gowvp/onvif/device"
 	m "github.com/gowvp/onvif/media"
+	ptzmodel "github.com/gowvp/onvif/ptz"
 	sdkdevice "github.com/gowvp/onvif/sdk/device"
 	sdkmedia "github.com/gowvp/onvif/sdk/media"
+	sdkptz "github.com/gowvp/onvif/sdk/ptz"
+	"github.com/gowvp/onvif/xsd"
 	xsdonvif "github.com/gowvp/onvif/xsd/onvif"
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/internal/core/sms"
@@ -289,4 +292,217 @@ func (a *Adapter) Discover(ctx context.Context, w io.Writer) error {
 			return nil
 		}
 	}
+}
+
+// PTZControl 实现 ipc.Protocoler 接口 - ONVIF 云台控制
+func (a *Adapter) PTZControl(ctx context.Context, dev *ipc.Device, ch *ipc.Channel, cmd ipc.PTZCommand) error {
+	onvifDev, ok := a.devices.Load(dev.ID)
+	if !ok {
+		return fmt.Errorf("ONVIF 设备未初始化")
+	}
+
+	// 根据动作类型执行不同的 PTZ 操作
+	switch cmd.Action {
+	case "continuous":
+		return a.continuousMove(ctx, onvifDev, ch, cmd)
+	case "stop":
+		return a.stopMove(ctx, onvifDev, ch, cmd)
+	case "absolute":
+		return a.absoluteMove(ctx, onvifDev, ch, cmd)
+	case "relative":
+		return a.relativeMove(ctx, onvifDev, ch, cmd)
+	case "preset":
+		return a.presetOperation(ctx, onvifDev, ch, cmd)
+	default:
+		return fmt.Errorf("不支持的 PTZ 动作类型: %s", cmd.Action)
+	}
+}
+
+// continuousMove 连续移动
+func (a *Adapter) continuousMove(ctx context.Context, onvifDev *Device, ch *ipc.Channel, cmd ipc.PTZCommand) error {
+	speed := cmd.Speed
+	if speed <= 0 || speed > 1 {
+		speed = 0.5
+	}
+
+	// 构建速度向量
+	velocity := xsdonvif.PTZSpeed{
+		PanTilt: xsdonvif.Vector2D{},
+		Zoom:    xsdonvif.Vector1D{},
+	}
+
+	// 根据方向设置 Pan/Tilt 速度
+	switch cmd.Direction {
+	case "up":
+		velocity.PanTilt.Y = speed
+	case "down":
+		velocity.PanTilt.Y = -speed
+	case "left":
+		velocity.PanTilt.X = -speed
+	case "right":
+		velocity.PanTilt.X = speed
+	case "upleft":
+		velocity.PanTilt.X = -speed
+		velocity.PanTilt.Y = speed
+	case "upright":
+		velocity.PanTilt.X = speed
+		velocity.PanTilt.Y = speed
+	case "downleft":
+		velocity.PanTilt.X = -speed
+		velocity.PanTilt.Y = -speed
+	case "downright":
+		velocity.PanTilt.X = speed
+		velocity.PanTilt.Y = -speed
+	case "zoomin":
+		velocity.Zoom.X = speed
+	case "zoomout":
+		velocity.Zoom.X = -speed
+	default:
+		return fmt.Errorf("不支持的方向: %s", cmd.Direction)
+	}
+
+	req := ptzmodel.ContinuousMove{
+		ProfileToken: xsdonvif.ReferenceToken(ch.ChannelID),
+		Velocity:     velocity,
+	}
+
+	_, err := sdkptz.Call_ContinuousMove(ctx, onvifDev.Device, req)
+	if err != nil {
+		return fmt.Errorf("ONVIF 连续移动失败: %w", err)
+	}
+
+	return nil
+}
+
+// stopMove 停止移动
+func (a *Adapter) stopMove(ctx context.Context, onvifDev *Device, ch *ipc.Channel, cmd ipc.PTZCommand) error {
+	req := ptzmodel.Stop{
+		ProfileToken: xsdonvif.ReferenceToken(ch.ChannelID),
+		PanTilt:      true,
+		Zoom:         true,
+	}
+
+	_, err := sdkptz.Call_Stop(ctx, onvifDev.Device, req)
+	if err != nil {
+		return fmt.Errorf("ONVIF 停止移动失败: %w", err)
+	}
+
+	return nil
+}
+
+// absoluteMove 绝对移动
+func (a *Adapter) absoluteMove(ctx context.Context, onvifDev *Device, ch *ipc.Channel, cmd ipc.PTZCommand) error {
+	position := xsdonvif.PTZVector{
+		PanTilt: xsdonvif.Vector2D{},
+		Zoom:    xsdonvif.Vector1D{},
+	}
+
+	// 设置位置
+	if cmd.X != 0 || cmd.Y != 0 {
+		position.PanTilt.X = cmd.X
+		position.PanTilt.Y = cmd.Y
+	}
+	if cmd.Zoom != 0 {
+		position.Zoom.X = cmd.Zoom
+	}
+
+	// 设置速度（可选）
+	speed := xsdonvif.PTZSpeed{}
+	if cmd.Speed > 0 && cmd.Speed <= 1 {
+		speed.PanTilt.X = cmd.Speed
+		speed.PanTilt.Y = cmd.Speed
+		speed.Zoom.X = cmd.Speed
+	}
+
+	req := ptzmodel.AbsoluteMove{
+		ProfileToken: xsdonvif.ReferenceToken(ch.ChannelID),
+		Position:     position,
+		Speed:        speed,
+	}
+
+	_, err := sdkptz.Call_AbsoluteMove(ctx, onvifDev.Device, req)
+	if err != nil {
+		return fmt.Errorf("ONVIF 绝对移动失败: %w", err)
+	}
+
+	return nil
+}
+
+// relativeMove 相对移动
+func (a *Adapter) relativeMove(ctx context.Context, onvifDev *Device, ch *ipc.Channel, cmd ipc.PTZCommand) error {
+	translation := xsdonvif.PTZVector{
+		PanTilt: xsdonvif.Vector2D{},
+		Zoom:    xsdonvif.Vector1D{},
+	}
+
+	// 设置相对位移
+	if cmd.X != 0 || cmd.Y != 0 {
+		translation.PanTilt.X = cmd.X
+		translation.PanTilt.Y = cmd.Y
+	}
+	if cmd.Zoom != 0 {
+		translation.Zoom.X = cmd.Zoom
+	}
+
+	// 设置速度（可选）
+	speed := xsdonvif.PTZSpeed{}
+	if cmd.Speed > 0 && cmd.Speed <= 1 {
+		speed.PanTilt.X = cmd.Speed
+		speed.PanTilt.Y = cmd.Speed
+		speed.Zoom.X = cmd.Speed
+	}
+
+	req := ptzmodel.RelativeMove{
+		ProfileToken: xsdonvif.ReferenceToken(ch.ChannelID),
+		Translation:  translation,
+		Speed:        speed,
+	}
+
+	_, err := sdkptz.Call_RelativeMove(ctx, onvifDev.Device, req)
+	if err != nil {
+		return fmt.Errorf("ONVIF 相对移动失败: %w", err)
+	}
+
+	return nil
+}
+
+// presetOperation 预置位操作
+func (a *Adapter) presetOperation(ctx context.Context, onvifDev *Device, ch *ipc.Channel, cmd ipc.PTZCommand) error {
+	if cmd.PresetID == "" {
+		return fmt.Errorf("预置位 ID 不能为空")
+	}
+
+	switch cmd.PresetOp {
+	case "goto":
+		req := ptzmodel.GotoPreset{
+			ProfileToken: xsdonvif.ReferenceToken(ch.ChannelID),
+			PresetToken:  xsdonvif.ReferenceToken(cmd.PresetID),
+		}
+		_, err := sdkptz.Call_GotoPreset(ctx, onvifDev.Device, req)
+		if err != nil {
+			return fmt.Errorf("ONVIF 转到预置位失败: %w", err)
+		}
+	case "set":
+		req := ptzmodel.SetPreset{
+			ProfileToken: xsdonvif.ReferenceToken(ch.ChannelID),
+			PresetName:   xsd.String(cmd.PresetID),
+		}
+		_, err := sdkptz.Call_SetPreset(ctx, onvifDev.Device, req)
+		if err != nil {
+			return fmt.Errorf("ONVIF 设置预置位失败: %w", err)
+		}
+	case "remove":
+		req := ptzmodel.RemovePreset{
+			ProfileToken: xsdonvif.ReferenceToken(ch.ChannelID),
+			PresetToken:  xsdonvif.ReferenceToken(cmd.PresetID),
+		}
+		_, err := sdkptz.Call_RemovePreset(ctx, onvifDev.Device, req)
+		if err != nil {
+			return fmt.Errorf("ONVIF 删除预置位失败: %w", err)
+		}
+	default:
+		return fmt.Errorf("不支持的预置位操作: %s", cmd.PresetOp)
+	}
+
+	return nil
 }

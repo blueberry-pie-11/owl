@@ -44,14 +44,14 @@ func DefaultConfig() Bootstrap {
 		},
 		Sip: SIP{
 			Port:     15060,
-			ID:       "34010000002000000001",
-			Domain:   "3401000000",
-			Password: "",
+			ID:       "53310000002000000001",
+			Domain:   "5331000000",
+			Password: "12345678",
 		},
 		Media: Media{
 			IP:           "127.0.0.1",
 			HTTPPort:     80,
-			Secret:       "",
+			Secret:       "SW7E5BlDHZc8ymkz1LrKRavJzLwXQNIZ",
 			WebHookIP:    "127.0.0.1",
 			SDPIP:        "127.0.0.1",
 			RTPPortRange: "20000-20100",

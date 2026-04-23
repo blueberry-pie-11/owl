@@ -160,6 +160,7 @@ func (g Adapter) SaveChannels(channels []*Channel) error {
 			_ = g.store.Channel().Edit(ctx, existing, func(c *Channel) error {
 				c.Name = channel.Name
 				c.IsOnline = channel.IsOnline
+				c.PTZType = channel.PTZType
 				c.Ext.Manufacturer = channel.Ext.Manufacturer
 				c.Ext.Firmware = channel.Ext.Firmware
 				c.Ext.GBVersion = channel.Ext.GBVersion

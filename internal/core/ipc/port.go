@@ -36,6 +36,9 @@ type Protocoler interface {
 
 	DeleteDevice(ctx context.Context, device *Device) error
 
+	// PTZControl 云台控制
+	PTZControl(ctx context.Context, device *Device, channel *Channel, cmd PTZCommand) error
+
 	Hooker
 }
 
@@ -60,4 +63,16 @@ type PlayResponse struct {
 	SSRC   string // GB28181 SSRC
 	Stream string // 流 ID
 	RTSP   string // RTSP 地址 (ONVIF)
+}
+
+// PTZCommand 云台控制命令
+type PTZCommand struct {
+	Action    string  `json:"action"`    // 动作类型: continuous(连续移动), absolute(绝对移动), relative(相对移动), stop(停止), preset(预置位)
+	Direction string  `json:"direction"` // 方向: up, down, left, right, upleft, upright, downleft, downright, zoomin, zoomout
+	Speed     float64 `json:"speed"`     // 速度 (0-1), 默认 0.5
+	X         float64 `json:"x"`         // X 轴位置 (绝对/相对移动时使用, -1 到 1)
+	Y         float64 `json:"y"`         // Y 轴位置 (绝对/相对移动时使用, -1 到 1)
+	Zoom      float64 `json:"zoom"`      // 缩放值 (绝对/相对移动时使用, 0 到 1)
+	PresetID  string  `json:"preset_id"` // 预置位 ID
+	PresetOp  string  `json:"preset_op"` // 预置位操作: goto(转到), set(设置), remove(删除)
 }

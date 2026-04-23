@@ -268,6 +268,12 @@ type Channels struct {
 	Secrecy     int    `xml:"Secrecy" json:"secrecy"  gorm:"column:secrecy"`
 	// Status 状态  on 在线
 	Status string `xml:"Status"  json:"status"  gorm:"column:status"`
+	// PTZType 云台类型 (厂商扩展字段，非 GB28181 标准必选字段)
+	// 取值: 0=无云台, >0=有云台 (具体值含义依赖厂商实现)
+	PTZType int `xml:"PTZType" json:"ptztype" gorm:"column:ptztype"`
+	// CameraType 摄像机类型 (厂商扩展字段)
+	// 取值: 1=球机, 2=半球, 3=固定枪机, 4=遥控枪机
+	CameraType int `xml:"CameraType" json:"camera_type" gorm:"-"`
 	// Active 最后活跃时间
 	Active int64  `json:"active"  gorm:"column:active"`
 	URIStr string ` json:"uri"  gorm:"column:uri"`

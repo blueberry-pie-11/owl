@@ -3,6 +3,7 @@ package ipc
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -457,4 +458,54 @@ func (c *Core) EditChannelOnlineAndPlaying(ctx context.Context, stream string, i
 		return nil, reason.ErrDB.Withf(`Edit err[%s]`, err.Error())
 	}
 	return &out, nil
+}
+
+// PTZControl 云台控制
+func (c *Core) PTZControl(ctx context.Context, channelID string, cmd PTZCommand) error {
+	// 获取通道信息
+	channel, err := c.GetChannel(ctx, channelID)
+	if err != nil {
+		return err
+	}
+
+	// 获取设备信息
+	device, err := c.GetDevice(ctx, channel.DID)
+	if err != nil {
+		return err
+	}
+
+	// 检查设备是否在线
+	if !device.IsOnline {
+		return reason.ErrBadRequest.SetMsg("设备离线")
+	}
+
+	// 调试日志：输出设备和通道信息
+	slog.InfoContext(ctx, "PTZ 控制请求",
+		"channel_id", channelID,
+		"channel_did", channel.DID,
+		"device_id", device.ID,
+		"device_type", device.Type,
+		"device_manufacturer", device.Ext.Manufacturer,
+		"available_protocols", c.getProtocolKeys())
+
+	// 获取协议类型（如果 type 为空，根据设备 ID 前缀判断）
+	protocolType := device.Type
+	if protocolType == "" {
+		// 根据设备 ID 前缀自动判断协议类型
+		if device.IsGB28181() {
+			protocolType = TypeGB28181
+		} else if device.IsOnvif() {
+			protocolType = TypeOnvif
+		}
+		slog.InfoContext(ctx, "设备 type 为空，自动推断协议类型", "inferred_type", protocolType)
+	}
+
+	// 获取协议适配器
+	protocol, ok := c.protocols[protocolType]
+	if !ok {
+		return reason.ErrBadRequest.SetMsg(fmt.Sprintf("不支持的协议类型: %s (可用协议: %v)", protocolType, c.getProtocolKeys()))
+	}
+
+	// 调用协议的 PTZ 控制方法
+	return protocol.PTZControl(ctx, device, channel, cmd)
 }

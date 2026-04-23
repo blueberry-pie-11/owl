@@ -70,11 +70,25 @@ func NewGB28181API(cfg *conf.Bootstrap, store ipc.Adapter, sms *sms.NodeManager)
 
 		out := make([]*ipc.Channel, len(channel))
 		for i, ch := range channel {
+			// 使用 PTZType 字段判断是否有云台能力
+			// PTZType > 0 表示有云台，0 表示无云台或未知
+			ptzType := ch.PTZType
+
+			// 调试日志：打印解析到的云台能力值
+			slog.Info("Catalog PTZ 解析",
+				"device_id", s,
+				"channel_id", ch.ChannelID,
+				"name", ch.Name,
+				"ptz_type", ch.PTZType,
+				"camera_type", ch.CameraType,
+				"result", ptzType)
+
 			out[i] = &ipc.Channel{
 				DeviceID:  s,
 				ChannelID: ch.ChannelID,
 				Name:      ch.Name,
 				IsOnline:  ch.Status == "OK" || ch.Status == "ON",
+				PTZType:   ptzType,
 				Ext: ipc.DeviceExt{
 					Manufacturer: ch.Manufacturer,
 					Model:        ch.Model,

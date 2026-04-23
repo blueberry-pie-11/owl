@@ -195,7 +195,7 @@ func (c Core) DelDevice(ctx context.Context, id string) (*Device, error) {
 }
 
 func (c Core) QueryCatalog(ctx context.Context, deviceID string) error {
-	device, err := c.GetDeviceByDeviceID(ctx, deviceID)
+	device, err := c.GetDevice(ctx, deviceID)
 	if err != nil {
 		return err
 	}
