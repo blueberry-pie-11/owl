@@ -4,10 +4,34 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gowvp/owl/pkg/zlm"
 )
+
+// splitFirstPort 将 "20000-20100" 拆为首端口与剩余段。
+//
+// 为什么: ZLM WebRTC 默认占 UDP/TCP 8000, 线上部署每加一台机器就要单独放行安全组一个端口;
+// 将 rtc.port 合并到 GB28181 RTP 端口段的首位, 运维只需开放一段区间, 其余端口仍给
+// rtp_proxy 做 GB28181 随机收流; ZLM 自己从 port_range 里挑, 无需 go 层管端口池。
+//
+// 返回: firstPort 字符串, 剩余 "start+1-end", 是否解析成功。解析失败由调用方回退。
+func splitFirstPort(rng string) (string, string, bool) {
+	i := strings.Index(rng, "-")
+	if i <= 0 || i == len(rng)-1 {
+		return "", "", false
+	}
+	startStr := strings.TrimSpace(rng[:i])
+	endStr := strings.TrimSpace(rng[i+1:])
+	start, err1 := strconv.Atoi(startStr)
+	end, err2 := strconv.Atoi(endStr)
+	if err1 != nil || err2 != nil || start <= 0 || start >= end {
+		return "", "", false
+	}
+	return startStr, fmt.Sprintf("%d-%d", start+1, end), true
+}
 
 var _ Driver = (*ZLMDriver)(nil)
 
@@ -89,6 +113,20 @@ func (d *ZLMDriver) Setup(ctx context.Context, ms *MediaServer, webhookURL strin
 		}
 	}
 	_ = ips
+
+	// 为什么: 把 WebRTC 的 UDP/TCP 端口合并到 RTP 端口段首位, 云安全组只需开放一段区间。
+	// 剩余端口(start+1..end)下发给 rtp_proxy.port_range, GB28181 随机收流自动避开首端口。
+	portRange := ms.RTPPortRange
+	rtcPort := ""
+	if p, rest, ok := splitFirstPort(ms.RTPPortRange); ok {
+		rtcPort = p
+		portRange = rest
+		slog.Info("ZLM 将 rtc 端口合并到 RTP 段首位",
+			"rtc.port", rtcPort, "rtp_proxy.port_range", portRange)
+	} else {
+		slog.Warn("ZLM RTPPortRange 解析失败, 保持 rtc 默认端口", "range", ms.RTPPortRange)
+	}
+
 	// 构造配置请求
 	req := zlm.SetServerConfigRequest{
 		RtcExternIP: new(strings.Join(ips, ",")),
@@ -118,7 +156,7 @@ func (d *ZLMDriver) Setup(ctx context.Context, ms *MediaServer, webhookURL strin
 		HookTimeoutSec:                 new("10"),
 		HookAliveInterval:              new(fmt.Sprint(ms.HookAliveInterval)),
 		ProtocolContinuePushMs:         new("3000"),
-		RtpProxyPortRange:              &ms.RTPPortRange,
+		RtpProxyPortRange:              &portRange,
 		FfmpegLog:                      new("./fflogs/ffmpeg.log"),
 
 		// 为什么: 低延迟直播优化, 但保留 GOP 缓存保证首画面快速呈现。
@@ -139,13 +177,64 @@ func (d *ZLMDriver) Setup(ctx context.Context, ms *MediaServer, webhookURL strin
 		RecordFastStart:  new("1"), // moov 写在开头，便于流式播放
 		RecordEnableFmp4: new("0"), // 启用 fMP4 格式，HLS.js 可直接播放
 	}
+	if rtcPort != "" {
+		req.RtcPort = &rtcPort
+		req.RtcTCPPort = &rtcPort
+	}
+
+	// 为什么: rtc.port / rtc.tcpPort 被 SetServerConfig 修改后只更新内存配置, 不会重新 bind UDP/TCP 套接字;
+	// 若 ZLM 当前监听端口与目标不一致(常见于首次把默认 8000 改成 RTP 段首位 20000), 必须重启 ZLM 进程后
+	// 新端口才会生效, 否则 WebRTC 的 ICE 会因目标 candidate 端口无人监听而长时间 checking 最终 failed。
+	// 这里仅在端口真实变更时触发一次重启, 常规热重启不受影响。
+	needRestart := false
+	var currentRtcPort string
+	if cfg, cerr := engine.GetServerConfig(); cerr == nil && len(cfg.Data) > 0 {
+		currentRtcPort = cfg.Data[0].RtcPort
+	}
 
 	resp, err := engine.SetServerConfig(&req)
 	if err != nil {
 		return err
 	}
 	slog.Info("ZLM 服务节点配置设置成功", "changed", resp.Changed)
+
+	if rtcPort != "" && currentRtcPort != "" && currentRtcPort != rtcPort {
+		needRestart = true
+	}
+	if needRestart {
+		slog.Info("ZLM rtc.port 变更, 重启 MediaServer 以重绑 UDP/TCP 端口",
+			"from", currentRtcPort, "to", rtcPort)
+		if rerr := engine.RestartServer(); rerr != nil {
+			slog.Warn("ZLM 重启调用失败, WebRTC 可能因端口未重绑而黑屏, 请手动重启容器", "err", rerr)
+			return nil
+		}
+		waitZLMReady(ctx, engine, rtcPort)
+	}
 	return nil
+}
+
+// waitZLMReady 轮询 ZLM 进程恢复并确认 rtc.port 已被新端口接管。
+//
+// 为什么: restartServer 接口是异步的, 重启后进程有 1~3s 不可达窗口, 直接返回会让调用方误以为配置已生效;
+// 循环探测 GetServerConfig 直到拿到预期 rtc.port 或总超时(10s), 给后续依赖 ZLM 的逻辑一个稳定的起点。
+func waitZLMReady(ctx context.Context, engine zlm.Engine, expectRtcPort string) {
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+		cfg, err := engine.GetServerConfig()
+		if err != nil || len(cfg.Data) == 0 {
+			continue
+		}
+		if cfg.Data[0].RtcPort == expectRtcPort {
+			slog.Info("ZLM 重启就绪, rtc.port 已生效", "rtc.port", expectRtcPort)
+			return
+		}
+	}
+	slog.Warn("等待 ZLM 重启就绪超时, 建议检查容器状态", "expect_rtc_port", expectRtcPort)
 }
 
 func (d *ZLMDriver) Ping(ctx context.Context, ms *MediaServer) error {

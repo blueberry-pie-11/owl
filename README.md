@@ -176,11 +176,9 @@ services:
       # zlm
       - 1935:1935 # rtmp
       - 554:554 # rtsp
-      - 8080:80 # http
-      - 8443:443 # https
-      - 10000:10000
-      - 8000:8000/udp
-      - 9000:9000/udp
+      # - 8080:80 # http
+      # - 8443:443 # https
+      # - 10000:10000
       - 20000-20100:20000-20100 # GB28181 stream receiving ports
       - 20000-20100:20000-20100/udp # GB28181 stream receiving UDP ports
     volumes:
@@ -226,6 +224,7 @@ If you're a Go developer familiar with Docker, you can download the source code 
   - [x] Device registration with 7 connection methods
   - [x] UDP and TCP signaling transport modes
   - [x] Device time synchronization
+  - [x] PTZ control support
   - [x] Information queries support
     - [x] Device catalog query
     - [x] Device info query
@@ -237,13 +236,14 @@ If you're a Go developer familiar with Docker, you can download the source code 
   - [x] g711a/g711u/aac audio codec support
   - [x] Snapshots
   - [x] CORS support
-  - [x] Chinese and English language support
-  - [x] ONVIF support
-  - [x] RTMP push streaming support
-  - [x] RTSP pull streaming support
-  - [x] AI algorithm analysis and alerting support
-  - [x] Cloud Recording playback (owl)
-  - [ ] SD Recording playback (ipc)
+  - [ ] SD Recording playback (ipc, recorded on camera SD card, no development plan)
+- [x] ONVIF device access and playback
+- [x] RTMP push streaming support
+- [x] RTSP pull streaming support
+- [x] AI algorithm analysis and alerting support
+- [x] Cloud Recording playback (owl)
+- [ ] ONVIF PTZ control support
+- [x] Chinese and English language support
 
 ## Acknowledgments
 
