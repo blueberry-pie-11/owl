@@ -158,7 +158,7 @@ func (a IPCAPI) queryCatalog(c *gin.Context, _ *struct{}) (any, error) {
 	did := c.Param("id")
 
 	if err := a.ipc.QueryCatalog(c.Request.Context(), did); err != nil {
-		return nil, ErrDevice.SetMsg(err.Error())
+		return nil, err
 	}
 
 	return gin.H{"msg": "ok"}, nil

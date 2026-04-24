@@ -77,9 +77,9 @@ func (c Core) GetDevice(ctx context.Context, id string) (*Device, error) {
 	var out Device
 	if err := c.store.Device().Get(ctx, &out, orm.Where("id=?", id)); err != nil {
 		if orm.IsErrRecordNotFound(err) {
-			return nil, reason.ErrNotFound.Withf(`Get err[%s]`, err.Error())
+			return nil, reason.ErrNotFound.Withf(`Get err[%s] id[%s]`, err.Error(), id)
 		}
-		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
+		return nil, reason.ErrDB.Withf(`Get err[%s] id[%s]`, err.Error(), id)
 	}
 	return &out, nil
 }
