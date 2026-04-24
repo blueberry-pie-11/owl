@@ -71,7 +71,7 @@ func (g *GB28181API) getSSRC(t int) string {
 		StreamList.ssrc = 0
 		r = true
 	}
-	key := fmt.Sprintf("%d%s%04d", t, g.cfg.Domain[3:8], StreamList.ssrc)
+	key := fmt.Sprintf("%d%s%04d", t, g.cfg.GetDomain()[3:8], StreamList.ssrc)
 	// stream := Streams{StreamID: ssrc2stream(key), Stop: false}
 	// if err := db.Get(db.DBClient, &stream); db.RecordNotFound(err) || stream.CreatedAt == 0 {
 	return key

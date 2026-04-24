@@ -84,8 +84,18 @@ type Log struct {
 type SIP struct {
 	Port     int    `comment:"服务监听的 tcp/udp 端口号" json:"port"`
 	ID       string `comment:"gb/t28181 20 位国标 ID" json:"id"`
-	Domain   string `comment:"域" json:"domain"`
 	Password string `comment:"注册密码" json:"password"`
+	Host     string `comment:"对设备宣告的本机地址(可选), 为空时按连接来源自动探测, 探测不可达时回退到 Media.SDPIP" json:"host"`
+}
+
+// GetDomain 从 ID 前 10 位解析国标域
+// 为什么: GB/T28181 ID 格式为 "行政区划(8) + 行业编码(2) + 类型编码(3) + 序号(7)", 前 10 位即域,
+// 与 ID 冗余存在易导致配置不一致从而设备注册失败, 故仅保留 ID, 域运行时派生。
+func (s *SIP) GetDomain() string {
+	if len(s.ID) >= 10 {
+		return s.ID[:10]
+	}
+	return s.ID
 }
 
 type Media struct {

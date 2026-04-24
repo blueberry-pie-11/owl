@@ -63,7 +63,7 @@ func NewGB28181API(cfg *conf.Bootstrap, store ipc.Adapter, sms *sms.NodeManager)
 					ChannelID: ch.ChannelID,
 					device:    d,
 				}
-				ch.init(g.cfg.Domain)
+				ch.init(g.cfg.GetDomain())
 				d.Channels.Store(ch.ChannelID, &ch)
 			}
 		}
@@ -127,6 +127,26 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		return
 	}
 
+	// 为什么: 设备端 Request-URI 的 user 部分应为目标平台 ID。若不一致说明设备侧 SIP 服务器 ID 配置错误,
+	// 直接放行会导致后续 MESSAGE/INVITE 因 Request-URI 不匹配被设备静默丢弃(海康等厂商严格校验),
+	// 提前拒绝并给出明确日志便于用户自查。
+	if recipient := ctx.Request.Recipient(); recipient != nil {
+		var reqID string
+		if u := recipient.User(); u != nil {
+			reqID = u.String()
+		}
+		if reqID != g.cfg.ID {
+			slog.Error("设备 SIP 服务器 ID 与平台不匹配，拒绝注册",
+				"device_id", ctx.DeviceID,
+				"device_target_id", reqID,
+				"platform_id", g.cfg.ID,
+				"source", ctx.Source.String(),
+			)
+			ctx.String(http.StatusForbidden, fmt.Sprintf("server id mismatch, expect %s got %s", g.cfg.ID, reqID))
+			return
+		}
+	}
+
 	dev, err := g.core.GetDeviceByDeviceID(ctx.DeviceID)
 	if err != nil {
 		ctx.Log.Error("GetDeviceByDeviceID", "err", err)
@@ -152,7 +172,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		hdrs := ctx.Request.GetHeaders("Authorization")
 		if len(hdrs) == 0 {
 			resp := sip.NewResponseFromRequest("", ctx.Request, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized), nil)
-			resp.AppendHeader(&sip.GenericHeader{HeaderName: "WWW-Authenticate", Contents: fmt.Sprintf(`Digest realm="%s",qop="auth",nonce="%s"`, g.cfg.Domain, sip.RandString(32))})
+			resp.AppendHeader(&sip.GenericHeader{HeaderName: "WWW-Authenticate", Contents: fmt.Sprintf(`Digest realm="%s",qop="auth",nonce="%s"`, g.cfg.GetDomain(), sip.RandString(32))})
 			_ = ctx.Tx.Respond(resp)
 			return
 		}

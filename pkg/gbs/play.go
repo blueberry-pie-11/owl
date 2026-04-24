@@ -281,7 +281,7 @@ func (g *GB28181API) sipPlayPush2(ch *Channel, in *PlayInput, port int, stream *
 	if contact, _ := resp.Contact(); contact == nil {
 		resp.AppendHeader(&sip.ContactHeader{
 			DisplayName: g.svr.fromAddress.DisplayName,
-			Address:     &sip.URI{FUser: sip.String{Str: g.cfg.ID}, FHost: g.cfg.Domain},
+			Address:     &sip.URI{FUser: sip.String{Str: g.cfg.ID}, FHost: g.cfg.GetDomain()},
 			Params:      sip.NewParams(),
 		})
 	}

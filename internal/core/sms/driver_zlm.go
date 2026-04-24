@@ -121,6 +121,18 @@ func (d *ZLMDriver) Setup(ctx context.Context, ms *MediaServer, webhookURL strin
 		RtpProxyPortRange:              &ms.RTPPortRange,
 		FfmpegLog:                      new("./fflogs/ffmpeg.log"),
 
+		// 为什么: 低延迟直播优化, 但保留 GOP 缓存保证首画面快速呈现。
+		// rtp_proxy.gop_cache 保持默认开启: 新连接进来立刻下发最近一个 I 帧缓冲, 首帧延迟 <1s; 由前端追帧消化多余缓冲。
+		// protocol.add_mute_audio=0: 无音频时不插静音帧, 免去等待音频同步的额外延迟。
+		// rtp.lowLatency=1/rtsp.lowLatency=1: 开启 ZLM 自身的低延迟标志, 关闭 RTP 累积缓冲策略。
+		// general.unready_frame_cache=50: 流未 ready 期间最多缓 50 帧(约 2 秒), 避免冷启动积压过多历史帧。
+		// general.mergeWriteMS=100: 写合并控制在 100ms, 平衡 TCP 发包碎片与延迟(默认 300ms 偏高)。
+		ProtocolAddMuteAudio:     new("0"),
+		RtpLowLatency:            new("1"),
+		RtspLowLatency:           new("1"),
+		GeneralUnreadyFrameCache: new("50"),
+		GeneralMergeWriteMS:      new("100"),
+
 		// 录像配置
 		// 移除默认的 "record" 目录层级，简化路径结构
 		RecordAppName:    new(""),

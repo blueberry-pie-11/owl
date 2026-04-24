@@ -18,6 +18,7 @@ type Device struct {
 	// 起这个名义会难以区分，但为了兼容已经部署的旧数据库...保留
 	DeviceID string `gorm:"column:device_id;notNull;uniqueIndex;default:'';comment:20 位国标编号" json:"device_id"` // 20 位国标编号
 
+	// 自定义名称
 	Name         string    `gorm:"column:name;notNull;default:'';comment:设备名称" json:"name"`                                                    // 设备名称
 	Transport    string    `gorm:"column:transport;notNull;default:'';comment:传输协议(tcp/udp)" json:"transport"`                                 // 传输协议(TCP/UDP)
 	StreamMode   int8      `gorm:"column:stream_mode;notNull;default:1;comment:数据传输模式(0:UDP; 1:TCP_PASSIVE; 2:TCP_ACTIVE)" json:"stream_mode"` // 数据传输模式
