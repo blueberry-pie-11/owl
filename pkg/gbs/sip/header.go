@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync/atomic"
 )
 
 // HeadersBuilder HeadersBuilder
@@ -25,13 +26,17 @@ type HeadersBuilder struct {
 	userAgent   *UserAgentHeader
 	maxForwards *MaxForwards
 	allow       *AllowHeader
-	supported   *SupportedHeader
+	subject     *Subject
 	XGBVer      *XGBVer
-	// recipient *URI
 }
+
+var cseqCounter atomic.Uint32
 
 // NewHeaderBuilder NewHeaderBuilder
 func NewHeaderBuilder() *HeadersBuilder {
+	if cseqCounter.Load() > 65535 {
+		cseqCounter.Store(0)
+	}
 	callID := CallID(RandString(32))
 	maxForwards := MaxForwards(70)
 	userAgent := UserAgentHeader("GoWVP")
@@ -41,64 +46,46 @@ func NewHeaderBuilder() *HeadersBuilder {
 		protocolVersion: "2.0",
 		host:            "localhost",
 		transport:       "UDP",
-		cseq:            &CSeq{SeqNo: 1},
+		cseq:            &CSeq{SeqNo: cseqCounter.Add(1)},
 		callID:          &callID,
 		via:             make(ViaHeader, 0),
 		userAgent:       &userAgent,
 		maxForwards:     &maxForwards,
 		generic:         make(map[string]Header),
 		allow:           defaultAllowMethods,
-		supported:       &SupportedHeader{Options: []string{}},
 		XGBVer:          &xgbVer,
 	}
 }
 
-// Build Build
+// Build 按参考实现的头顺序构建：Via → From → To → CallID → CSeq → ContentType → Contact → MaxForwards → UserAgent → Subject → XGBVer
 func (hb *HeadersBuilder) Build() []Header {
 	hdrs := make([]Header, 0)
-	if hb.supported != nil {
-		hdrs = append(hdrs, hb.supported)
-	}
-	if hb.allow != nil {
-		hdrs = append(hdrs, hb.allow)
-	}
-	// if hb.route != nil {
-	// 	hdrs = append(hdrs, hb.route)
-	// }
 	if len(hb.via) != 0 {
 		via := make(ViaHeader, 0)
 		via = append(via, hb.via...)
 		hdrs = append(hdrs, via)
 	}
 
-	hdrs = append(hdrs, hb.cseq, hb.from, hb.to, hb.callID)
+	hdrs = append(hdrs, hb.from, hb.to, hb.callID, hb.cseq)
 
+	if hb.contentType != nil {
+		hdrs = append(hdrs, hb.contentType)
+	}
 	if hb.contact != nil {
 		hdrs = append(hdrs, hb.contact)
 	}
 	if hb.maxForwards != nil {
 		hdrs = append(hdrs, hb.maxForwards)
 	}
-	// if hb.expires != nil {
-	// 	hdrs = append(hdrs, hb.expires)
-	// }
-
-	// if hb.accept != nil {
-	// 	hdrs = append(hdrs, hb.accept)
-	// }
 	if hb.userAgent != nil {
 		hdrs = append(hdrs, hb.userAgent)
 	}
-	if hb.contentType != nil {
-		hdrs = append(hdrs, hb.contentType)
+	if hb.subject != nil {
+		hdrs = append(hdrs, hb.subject)
 	}
 	if hb.XGBVer != nil {
 		hdrs = append(hdrs, hb.XGBVer)
 	}
-
-	// for _, header := range hb.generic {
-	// 	hdrs = append(hdrs, header)
-	// }
 	return hdrs
 }
 
@@ -106,6 +93,27 @@ func (hb *HeadersBuilder) SetXGBVer() *HeadersBuilder {
 	s := XGBVer("3.0")
 	hb.XGBVer = &s
 	return hb
+}
+
+// SetSubject 设置 Subject 头
+func (hb *HeadersBuilder) SetSubject(v string) *HeadersBuilder {
+	s := Subject(v)
+	hb.subject = &s
+	return hb
+}
+
+// Subject SIP Subject 头
+type Subject string
+
+func (ct Subject) String() string { return "Subject: " + string(ct) }
+func (ct *Subject) Name() string  { return "Subject" }
+func (ct Subject) Clone() Header  { return &ct }
+func (ct *Subject) Equals(other any) bool {
+	h, ok := other.(Subject)
+	if !ok {
+		return false
+	}
+	return h.String() == ct.String()
 }
 
 // SetMethod SetMethod

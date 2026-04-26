@@ -46,8 +46,12 @@ type Server struct {
 func NewServer(cfg *conf.Bootstrap, store ipc.Adapter, sc sms.Core) (*Server, func()) {
 	api := NewGB28181API(cfg, store, sc.NodeManager)
 
-	iip := ip.InternalIP()
-	uri, _ := sip.ParseSipURI(fmt.Sprintf("sip:%s@%s:%d", cfg.Sip.ID, iip, cfg.Sip.Port))
+	// 优先使用配置的公网地址，空时回退内网探测
+	sipHost := cfg.Sip.Host
+	if sipHost == "" {
+		sipHost = ip.InternalIP()
+	}
+	uri, _ := sip.ParseSipURI(fmt.Sprintf("sip:%s@%s:%d", cfg.Sip.ID, sipHost, cfg.Sip.Port))
 	from := sip.Address{
 		DisplayName: sip.String{Str: "gowvp/owl"},
 		URI:         &uri,
@@ -90,8 +94,11 @@ func NewServer(cfg *conf.Bootstrap, store ipc.Adapter, sc sms.Core) (*Server, fu
 // SetConfig 热更新 SIP 配置，用于配置变更时更新 from 地址而无需重启服务
 func (s *Server) SetConfig() {
 	cfg := s.gb.cfg
-	iip := ip.InternalIP()
-	uri, _ := sip.ParseSipURI(fmt.Sprintf("sip:%s@%s:%d", cfg.ID, iip, cfg.Port))
+	sipHost := cfg.Host
+	if sipHost == "" {
+		sipHost = ip.InternalIP()
+	}
+	uri, _ := sip.ParseSipURI(fmt.Sprintf("sip:%s@%s:%d", cfg.ID, sipHost, cfg.Port))
 	from := sip.Address{
 		DisplayName: sip.String{Str: "gowvp/owl"},
 		URI:         &uri,
@@ -189,7 +196,6 @@ func LoadSYSInfo() {
 	_activeDevices = ActiveDevices{sync.Map{}}
 
 	StreamList = streamsList{&sync.Map{}, &sync.Map{}, 0}
-	ssrcLock = &sync.Mutex{}
 	_recordList = &sync.Map{}
 	RecordList = apiRecordList{items: map[string]*apiRecordItem{}, l: sync.RWMutex{}}
 

@@ -96,19 +96,46 @@ type Targeter interface {
 
 type RequestOption func(*sip.Request)
 
+// wrapRequest 构造并发送一个通用 SIP 请求。
 func (s *Server) wrapRequest(t Targeter, method string, contentType *sip.ContentType, body []byte, opts ...RequestOption) (*sip.Transaction, error) {
 	to := t.To()
 	conn := t.Conn()
 	source := t.Source()
 
+	from := s.fromAddress.Clone()
+	from.Params = sip.NewParams().Add("tag", sip.String{Str: sip.RandString(10)})
+
+	contact := s.fromAddress.Clone()
+	contact.Params = sip.NewParams()
+
+	transport := "UDP"
+	if source != nil && source.Network() == "tcp" {
+		transport = "TCP"
+	}
+
+	// Via Host 优先级: 配置 sip.host → conn.LocalAddr（设备连接本端地址） → fromAddress LAN IP
+	viaHost := s.gb.cfg.Host
+	if viaHost == "" && conn != nil {
+		if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+			viaHost = host
+		}
+	}
+	if viaHost == "" {
+		viaHost = s.fromAddress.URI.FHost
+	}
+
 	hb := sip.NewHeaderBuilder().
 		SetTo(to).
-		SetFrom(&s.fromAddress).
+		SetFrom(from).
 		SetContentType(contentType).
 		SetMethod(method).
-		SetContact(&s.fromAddress).
+		SetContact(contact).
 		AddVia(&sip.ViaHop{
-			Params: sip.NewParams().Add("branch", sip.String{Str: sip.GenerateBranch()}),
+			ProtocolName:    "SIP",
+			ProtocolVersion: "2.0",
+			Transport:       transport,
+			Host:            viaHost,
+			Params:          sip.NewParams().Add("branch", sip.String{Str: sip.GenerateBranch()}),
 		})
 
 	req := sip.NewRequest("", method, to.URI, sip.DefaultSipVersion, hb.Build(), body)

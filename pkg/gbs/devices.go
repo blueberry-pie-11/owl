@@ -30,6 +30,8 @@ type Device struct {
 	IsOnline bool
 	Address  string
 	Password string
+	// 设备注册时 From 头的 SIP 域名，用于构造 INVITE To URI
+	region string
 
 	conn   sip.Connection
 	source net.Addr
@@ -56,6 +58,12 @@ func NewDevice(conn sip.Connection, d *ipc.Device) *Device {
 		return nil
 	}
 
+	// DB 重建时用 DeviceID 前 10 位推导 SIP 域名，设备重新注册后会被实际值覆盖
+	region := d.Address
+	if did := d.GetGB28181DeviceID(); len(did) >= 10 {
+		region = did[:10]
+	}
+
 	c := Device{
 		conn:   conn,
 		source: addr,
@@ -64,6 +72,7 @@ func NewDevice(conn sip.Connection, d *ipc.Device) *Device {
 			Params: sip.NewParams(),
 		},
 		Address:         d.Address,
+		region:          region,
 		LastKeepaliveAt: d.KeepaliveAt.Time,
 		LastRegisterAt:  d.RegisteredAt.Time,
 		IsOnline:        d.IsOnline,
@@ -89,13 +98,18 @@ func (d *Device) CheckConnection() error {
 	return nil
 }
 
+// LoadChannels 从 DB 重建设备通道，domain 取设备注册域名，无则回退 IP:Port
 func (d *Device) LoadChannels(channels ...*ipc.Channel) {
+	domain := d.region
+	if domain == "" {
+		domain = d.Address
+	}
 	for _, channel := range channels {
 		ch := Channel{
 			ChannelID: channel.ChannelID,
 			device:    d,
 		}
-		ch.init(d.Address)
+		ch.init(domain)
 		d.Channels.Store(channel.ChannelID, &ch)
 	}
 }

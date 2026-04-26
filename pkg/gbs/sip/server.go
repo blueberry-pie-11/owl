@@ -321,14 +321,20 @@ func (s *Server) Request(req *Request) (*Transaction, error) {
 	if !ok {
 		return nil, fmt.Errorf("missing required 'Via' header")
 	}
-	viaHop.Host = s.host.String()
-	viaHop.Port = s.port
+	if viaHop.Host == "" {
+		viaHop.Host = s.host.String()
+	}
+	if viaHop.Port == nil {
+		viaHop.Port = s.port
+	}
 	if viaHop.Params == nil {
 		viaHop.Params = NewParams().Add("branch", String{Str: GenerateBranch()})
 	}
 	if !viaHop.Params.Has("rport") {
 		viaHop.Params.Add("rport", nil)
 	}
+
+	slog.Debug("SIP 最终发送报文", "method", req.Method(), "request", req.String())
 
 	tx := s.mustTX(req)
 	return tx, tx.Request(req)

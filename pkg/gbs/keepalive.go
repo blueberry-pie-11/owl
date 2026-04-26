@@ -29,6 +29,7 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 		conn:   ctx.Request.GetConnection(),
 		source: ctx.Source,
 		to:     ctx.To,
+		region: ctx.To.URI.Host(),
 	})
 
 	if err := g.svr.memoryStorer.Change(ctx.DeviceID, func(d *ipc.Device) error {
@@ -41,6 +42,7 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 		d.conn = ctx.Request.GetConnection()
 		d.source = ctx.Source
 		d.to = ctx.To
+		d.region = ctx.To.URI.Host()
 	}); err != nil {
 		ctx.Log.Error("keepalive", "err", err)
 	}

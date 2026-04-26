@@ -58,12 +58,17 @@ func NewGB28181API(cfg *conf.Bootstrap, store ipc.Adapter, sms *sms.NodeManager)
 
 		d, ok := g.svr.memoryStorer.Load(s)
 		if ok {
+			// 使用设备注册时的 SIP 域名构造通道 URI，而非服务器 ID 域名
+			domain := d.region
+			if domain == "" {
+				domain = g.cfg.GetDomain()
+			}
 			for _, ch := range channel {
 				ch := Channel{
 					ChannelID: ch.ChannelID,
 					device:    d,
 				}
-				ch.init(g.cfg.GetDomain())
+				ch.init(domain)
 				d.Channels.Store(ch.ChannelID, &ch)
 			}
 		}
@@ -157,6 +162,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		conn:   ctx.Request.GetConnection(),
 		source: ctx.Source,
 		to:     ctx.To,
+		region: ctx.To.URI.Host(),
 	})
 
 	password := dev.Password
@@ -240,6 +246,7 @@ func (g GB28181API) login(ctx *sip.Context, fn func(d *ipc.Device) error) {
 		d.conn = ctx.Request.GetConnection()
 		d.source = ctx.Source
 		d.to = ctx.To
+		d.region = ctx.To.URI.Host()
 	})
 }
 
