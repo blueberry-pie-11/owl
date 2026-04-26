@@ -53,7 +53,7 @@ func (e *DeviceExt) GetRecordMode() string {
 }
 
 func (e *DeviceExt) IsAlwaysRecord() bool {
-	return e.RecordMode == "always" || e.RecordMode == ""
+	return e.RecordMode == "always"
 }
 
 func (e *DeviceExt) IsAIRecord() bool {
