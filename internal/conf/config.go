@@ -82,10 +82,10 @@ type Log struct {
 }
 
 type SIP struct {
-	Port     int    `comment:"服务监听的 tcp/udp 端口号" json:"port"`
-	ID       string `comment:"gb/t28181 20 位国标 ID" json:"id"`
-	Password string `comment:"注册密码" json:"password"`
 	Host     string `comment:"对设备宣告的本机地址(可选), 为空时按连接来源自动探测, 探测不可达时回退到 Media.SDPIP" json:"host"`
+	Port     int    `comment:"服务监听的 TCP/UDP 端口号" json:"port"`
+	ID       string `comment:"GB/T 28181 20 位国标 ID" json:"id"`
+	Password string `comment:"全局注册密码，每个设备可单独设置，空串则无限制接入" json:"password"`
 }
 
 // GetDomain 从 ID 前 10 位解析国标域

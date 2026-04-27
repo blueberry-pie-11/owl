@@ -32,6 +32,13 @@ type Channel struct {
 	HasRecording bool `gorm:"-" json:"has_recording"` // 是否存在录像（查询时动态填充）
 }
 
+func (c *Channel) GetType() string {
+	if c.Type != "" {
+		return c.Type
+	}
+	return GetType(c.ID)
+}
+
 // TableName database table name
 func (*Channel) TableName() string {
 	return "channels"

@@ -484,12 +484,12 @@ func (c *Core) PTZControl(ctx context.Context, channelID string, cmd PTZCommand)
 		"channel_id", channelID,
 		"channel_did", channel.DID,
 		"device_id", device.ID,
-		"device_type", device.Type,
+		"device_type", device.GetType(),
 		"device_manufacturer", device.Ext.Manufacturer,
 		"available_protocols", c.getProtocolKeys())
 
 	// 获取协议类型（如果 type 为空，根据设备 ID 前缀判断）
-	protocolType := device.Type
+	protocolType := device.GetType()
 	if protocolType == "" {
 		// 根据设备 ID 前缀自动判断协议类型
 		if device.IsGB28181() {

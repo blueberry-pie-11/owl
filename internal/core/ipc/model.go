@@ -27,7 +27,7 @@ func GetType(stream string) string {
 	case bz.IsRTMP(stream):
 		return TypeRTMP
 	default:
-		return ""
+		return TypeGB28181
 	}
 }
 
@@ -61,7 +61,7 @@ func (e *DeviceExt) IsAIRecord() bool {
 }
 
 func (e *DeviceExt) IsNoneRecord() bool {
-	return e.RecordMode == "none"
+	return e.RecordMode == "none" || e.RecordMode == ""
 }
 
 // Scan implements orm.Scaner.

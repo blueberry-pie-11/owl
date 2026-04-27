@@ -114,7 +114,7 @@ func (s *Server) wrapRequest(t Targeter, method string, contentType *sip.Content
 	}
 
 	// Via Host 优先级: 配置 sip.host → conn.LocalAddr（设备连接本端地址） → fromAddress LAN IP
-	viaHost := s.gb.cfg.Host
+	viaHost := resolveHost(s.gb.cfg.Host)
 	if viaHost == "" && conn != nil {
 		if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
 			viaHost = host

@@ -142,19 +142,42 @@ func (api UserAPI) login(_ *gin.Context, in *loginInput) (*loginOutput, error) {
 	}, nil
 }
 
-// 修改凭据请求结构体
+// 修改凭据请求结构体（加密传输）
 type updateCredentialsInput struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Data string `json:"data" binding:"required"`
 }
 
-// 修改凭据接口
+// 修改凭据接口，需旧密码校验通过才允许修改
 func (api UserAPI) updateCredentials(_ *gin.Context, in *updateCredentialsInput) (gin.H, error) {
-	// 更新配置中的用户名和密码
-	api.conf.Server.Username = in.Username
-	api.conf.Server.Password = in.Password
+	body, err := api.secret.Decrypt(in.Data)
+	if err != nil {
+		return nil, reason.ErrServer.SetMsg(err.Error())
+	}
+	var credentials struct {
+		OldPassword string `json:"old_password"`
+		Username    string `json:"username"`
+		Password    string `json:"password"`
+	}
+	if err := json.Unmarshal(body, &credentials); err != nil {
+		return nil, reason.ErrServer.SetMsg(err.Error())
+	}
 
-	// 写入配置文件
+	if credentials.Username == "" || credentials.Password == "" {
+		return nil, reason.ErrServer.SetMsg("账号和密码不能为空")
+	}
+
+	// 校验旧密码
+	currentPassword := api.conf.Server.Password
+	if currentPassword == "" {
+		currentPassword = "admin"
+	}
+	if credentials.OldPassword != currentPassword {
+		return nil, reason.ErrServer.SetMsg("旧密码错误")
+	}
+
+	api.conf.Server.Username = credentials.Username
+	api.conf.Server.Password = credentials.Password
+
 	if err := conf.WriteConfig(api.conf, api.conf.ConfigPath); err != nil {
 		return nil, reason.ErrServer.SetMsg("保存配置失败: " + err.Error())
 	}

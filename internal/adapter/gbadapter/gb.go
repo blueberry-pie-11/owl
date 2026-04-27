@@ -80,9 +80,9 @@ func (a *Adapter) StartPlay(ctx context.Context, device *ipc.Device, channel *ip
 	panic("unimplemented")
 }
 
-// StopPlay implements ipc.Protocoler.
+// StopPlay 通过 SIP BYE 通知设备停止推流，并关闭 ZLM 的 RTP 接收端口
 func (a *Adapter) StopPlay(ctx context.Context, device *ipc.Device, channel *ipc.Channel) error {
-	panic("unimplemented")
+	return a.gbs.StopPlay(ctx, &gbs.StopPlayInput{Channel: channel})
 }
 
 // ValidateDevice implements ipc.Protocoler.

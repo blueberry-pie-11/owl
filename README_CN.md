@@ -294,6 +294,7 @@ services:
 - [x] 云端录像回放(由 owl 录制)
 - [ ] 支持 ONVIF PTZ 云台控制
 - [x] 支持中文和 English
+- [x] SIP IP 限流，国外攻击特征系统防护，防止云服务被境外 sip 攻击
 
 
 ## 感谢

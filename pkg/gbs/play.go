@@ -279,7 +279,7 @@ func (g *GB28181API) sipPlayPush2(ch *Channel, in *PlayInput, port int, stream *
 	}
 
 	// Via Host 优先级: 配置 sip.host → conn.LocalAddr → fromAddress LAN IP
-	viaHost := g.cfg.Host
+	viaHost := resolveHost(g.cfg.Host)
 	if viaHost == "" && conn != nil {
 		if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
 			viaHost = host

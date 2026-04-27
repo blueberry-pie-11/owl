@@ -12,7 +12,7 @@ import (
 // Device domain model
 type Device struct {
 	ID   string `gorm:"primaryKey" json:"id"`
-	Type string `gorm:"column:type;notNull;default:'';comment:设备类型(onvif)" json:"type"` // 设备类型(onvif/gb28181)
+	Type string `gorm:"column:type;notNull;default:'GB28181';comment:设备类型(onvif)" json:"type"` // 设备类型(onvif/gb28181)
 
 	// 自定义 id 可以简写为 did，国标 device_id 应简写成 gbid，而不是 device_id
 	// 起这个名义会难以区分，但为了兼容已经部署的旧数据库...保留

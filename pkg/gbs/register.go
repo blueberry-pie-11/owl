@@ -126,12 +126,6 @@ func filterUnknowDevices(deviceID string) error {
 }
 
 func (g *GB28181API) handlerRegister(ctx *sip.Context) {
-	if err := filterUnknowDevices(ctx.DeviceID); err != nil {
-		slog.Error("过滤设备，拒绝注册", "device_id", ctx.DeviceID, "err", err)
-		ctx.String(http.StatusBadRequest, err.Error())
-		return
-	}
-
 	// 为什么: 设备端 Request-URI 的 user 部分应为目标平台 ID。若不一致说明设备侧 SIP 服务器 ID 配置错误,
 	// 直接放行会导致后续 MESSAGE/INVITE 因 Request-URI 不匹配被设备静默丢弃(海康等厂商严格校验),
 	// 提前拒绝并给出明确日志便于用户自查。

@@ -255,6 +255,11 @@ func (d *ZLMDriver) CloseRTPServer(ctx context.Context, ms *MediaServer, req *zl
 	return engine.CloseRTPServer(*req)
 }
 
+func (d *ZLMDriver) CloseStreams(ctx context.Context, ms *MediaServer, req *zlm.CloseStreamsRequest) (*zlm.CloseStreamsResponse, error) {
+	engine := d.withConfig(ms)
+	return engine.CloseStreams(*req)
+}
+
 func (d *ZLMDriver) AddStreamProxy(ctx context.Context, ms *MediaServer, req *AddStreamProxyRequest) (*zlm.AddStreamProxyResponse, error) {
 	engine := d.withConfig(ms)
 	return engine.AddStreamProxy(zlm.AddStreamProxyRequest{

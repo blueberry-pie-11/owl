@@ -43,11 +43,28 @@ type Server struct {
 	memoryStorer MemoryStorer
 }
 
+// resolveHost 将 host 统一为 IP：域名做 DNS 解析，IP 直接返回
+func resolveHost(host string) string {
+	if host == "" {
+		return ""
+	}
+	if net.ParseIP(host) != nil {
+		return host
+	}
+	addrs, err := net.LookupHost(host)
+	if err != nil || len(addrs) == 0 {
+		slog.Warn("resolveHost failed, fallback to raw host", "host", host, "err", err)
+		return host
+	}
+	slog.Debug("resolveHost", "host", host, "resolved", addrs[0])
+	return addrs[0]
+}
+
 func NewServer(cfg *conf.Bootstrap, store ipc.Adapter, sc sms.Core) (*Server, func()) {
 	api := NewGB28181API(cfg, store, sc.NodeManager)
 
-	// 优先使用配置的公网地址，空时回退内网探测
-	sipHost := cfg.Sip.Host
+	// 优先使用配置的公网地址，空时回退内网探测；域名自动解析为 IP
+	sipHost := resolveHost(cfg.Sip.Host)
 	if sipHost == "" {
 		sipHost = ip.InternalIP()
 	}
@@ -59,6 +76,14 @@ func NewServer(cfg *conf.Bootstrap, store ipc.Adapter, sc sms.Core) (*Server, fu
 	}
 
 	svr = sip.NewServer(&from)
+
+	svr.Use(func(c *sip.Context) {
+		if filterUnknowDevices(c.DeviceID) != nil {
+			c.Abort()
+			return
+		}
+		c.Next()
+	})
 	svr.Register(api.handlerRegister)
 	msg := svr.Message()
 	msg.Handle("Keepalive", api.sipMessageKeepalive)
@@ -94,7 +119,7 @@ func NewServer(cfg *conf.Bootstrap, store ipc.Adapter, sc sms.Core) (*Server, fu
 // SetConfig 热更新 SIP 配置，用于配置变更时更新 from 地址而无需重启服务
 func (s *Server) SetConfig() {
 	cfg := s.gb.cfg
-	sipHost := cfg.Host
+	sipHost := resolveHost(cfg.Host)
 	if sipHost == "" {
 		sipHost = ip.InternalIP()
 	}
