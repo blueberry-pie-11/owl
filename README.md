@@ -45,8 +45,6 @@ Two streaming media servers are supported:
   - Custom feature development available
   - G711 (G711A/G711U) to AAC transcoding support
 
-Player uses @dexter's [jessibuca](https://github.com/langhuihui/jessibuca/tree/v3)
-
 Project framework based on @ixugo's [goddd](https://github.com/ixugo/goddd)
 
 ## FAQ

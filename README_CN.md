@@ -50,8 +50,6 @@
   - 支持特色功能定制
   - 支持 G711(G711A/G711U) 转 AAC
 
-播放器使用@dexter [jessibuca](https://github.com/langhuihui/jessibuca/tree/v3)
-
 项目框架基于 @ixugo [goddd](https://github.com/ixugo/goddd)
 
 ## QA
