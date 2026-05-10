@@ -132,6 +132,35 @@ AI detection is enabled by default, detecting 5 frames per second.
 
 You can disable AI detection by setting `disabledAI = true` in `configs/config.toml`
 
+## Third-Party Authentication
+
+GoWVP supports forwarding authentication requests to a third-party service, ideal for environments with an existing unified authentication system (SSO, OAuth2, corporate account systems, etc.).
+
+**Sequence Diagram**
+
+![](./docs/auth.webp)
+
+**Use Cases**
+
++ Your organization has a unified login system and you want GoWVP to reuse existing sessions without requiring users to log in again
++ Enterprise intranet environments that need to integrate with LDAP, CAS, OAuth2, or other authentication providers
++ API gateway handles authentication and you want to pass the verification result through to GoWVP
+
+**Configuration**
+
+Set `AuthURL` to your third-party authentication service address in `configs/config.toml`:
+
+```toml
+[Server.HTTP]
+  AuthURL = "https://your-auth-server.com/api/verify"
+```
+
+**How It Works**
+
+Once `AuthURL` is configured, all requests are verified through the third-party authentication service. GoWVP forwards the original request headers and body as a POST to the specified URL. A `200` response means authentication passes; any other status code means failure, and the response body is returned directly to the client.
+
+> Note: The third-party auth service must respond within 10 seconds, otherwise the request is considered timed out.
+
 ## Documentation
 
 GoWVP [Online API Documentation](https://apifox.com/apidoc/shared-7b67c918-5f72-4f64-b71d-0593d7427b93)

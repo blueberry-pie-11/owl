@@ -174,6 +174,35 @@ ai 分析会拉取一道流，程序会以为有人观看
 
 
 
+## 第三方鉴权
+
+支持将鉴权请求转发到第三方服务，适用于已有统一认证体系的场景（如 SSO、OAuth2、企业内部账号系统等）。
+
+**时序图**
+
+![](./docs/auth.webp)
+
+**使用场景**
+
++ 已有统一登录系统，希望 owl 复用现有会话，无需再次登录
++ 企业内网环境，需要对接 LDAP、CAS、OAuth2 等认证源
++ API 网关层已做鉴权，希望将校验结果透传到 owl
+
+**配置方式**
+
+在 `configs/config.toml` 中设置 `AuthURL` 为你的第三方鉴权服务地址：
+
+```toml
+[Server.HTTP]
+  AuthURL = "https://your-auth-server.com/api/verify"
+```
+
+**工作原理**
+
+配置 `AuthURL` 后，所有请求将通过第三方鉴权服务验证权限。GoWVP 会以 POST 方式将原始请求的 Header 和 Body 透传到该地址，第三方服务返回 `200` 表示鉴权通过，其它状态码则鉴权失败，响应内容直接返回给客户端。
+
+> 注意：第三方鉴权服务需要在 10 秒内响应，否则视为超时失败。
+
 ## 文档
 
 GoWVP [在线接口文档](https://apifox.com/apidoc/shared-7b67c918-5f72-4f64-b71d-0593d7427b93)
